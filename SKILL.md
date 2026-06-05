@@ -155,6 +155,10 @@ Supervisor 检查用户是否同时提供了：
   toolset:
     builtins: [通用工具列表]
     skills:   [需要加载的专业技能]
+  skill_mode:
+    model:  推荐绑定的模型（可选）
+    对需要高推理或特殊能力的维度，绑定最合适的模型
+    默认用 Supervisor 的模型，不绑也没关系
 ```
 
 #### 步骤③：对每个硬框架生成软参数
@@ -384,14 +388,18 @@ freeze:
 步骤 2：遍历 ROSTER.md 中的每个 roster 条目
   对每个 roster[i]：
     → 构建完整 prompt（共享模板 + 该条目字段）
+    → 准备 spawn 参数：
+        cmd = {
+          "prompt": <构建好的完整prompt>,
+          "name": roster[i].id,
+          "team_name": <团队名称>,
+          "subagent_type": "general-purpose",
+          "mode": "default"
+        }
+    → 如果 roster[i].skill_mode.model 存在：
+        将 model 参数加入 cmd
     → 使用 Agent 工具 spawn：
-        Agent({
-          prompt: <构建好的完整prompt>,
-          name: roster[i].id,
-          team_name: <团队名称>,
-          subagent_type: "general-purpose",
-          mode: "default"
-        })
+        Agent(cmd)
 ```
 
 ---
