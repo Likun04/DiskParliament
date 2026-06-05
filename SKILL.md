@@ -1,24 +1,43 @@
 ---
 name: disk-parliament
 description: >
-  专家议会 v2.0 — 多 Agent 通过盘上 Markdown 笔记异步通信的协议技能。
-  议题肃正 → 需求坍缩 → 生成 ROSTER.md → 根据 ROSTER spawn 子 Agent →
-  禁止 SendMessage，全走 notes/ 盘上 mail 异步通信。
+  专家议会 v2.2 — 多 Agent 盘上异步通信协议。Supervisor 自动坍缩需求→生成 ROSTER→
+  spawn 子 Agent（支持逐专家绑定不同模型）→盘上写信→收敛冻结。引入岗位系统（252个固化模板 + 人设拮抗），
+  人设与岗位分离，支持一岗双人拮抗。
+  议题肃正 → 需求坍缩 → 岗位匹配 → 人设拮抗配置 → spawn 子 Agent →
+  盘上 mail 异步通信（禁止 SendMessage）→ 收敛判定 → 冻结产出。
   Supervisor 只做轮询唤醒 + 收敛判定，不编排发言顺序。
   触发词：专家议会、盘上议会、开个议会、启动议会、开个讨论组、异步讨论、
   多Agent协作、DiskParliament、异步通信、Protocol启动、专家讨论、
   开个异步会议、角色扮演讨论、多角色碰撞、专家会诊、
   复杂问题分析、话题讨论、团队协作、分工讨论。
 metadata:
-  version: "2.0"
-  protocol_version: "v5.0"
+  version: "2.2"
+  protocol_version: "v5.2"
   agent_created: true
 ---
 
-# 专家议会（DiskParliament）v2.0
+# 专家议会（DiskParliament）v2.2
 
 > **核心原则**：多 Agent 通过盘上文件（notes/）异步通信，禁止任何形式的即时对话（SendMessage）。
 > 写出去的文件不可修改，没话说了就不写（自然停火），Supervisor 只做唤醒 + 判定。
+
+> **⚠️ 协议执行者禁令（必须遵守）**
+>
+> 本 Skill 的执行者（即你当前的角色）是**协议执行者**，不是分析师、设计师或规划者。
+>
+> **禁止行为（违反即协议失败）：**
+> - ❌ 在进入 T0 之前替用户分析/规划/设计方案
+> - ❌ 在 T0 之前产生任何与议题相关的输出
+> - ❌ 替子 Agent 写内容、做分析、做决策
+> - ❌ 在 spawn 之前产生任何"大致规划"或"初步分析"
+>
+> **正确行为：**
+> - ✅ 收到用户请求 → 立即进入 T0（强制索要主题 + 产出）
+> - ✅ 用户未提供完整信息 → 追问，不猜测
+> - ✅ T1-T5 按协议步骤执行
+> - ✅ 唯一一次输出在 T5 冻结后：BRIEFING.md + 通知用户
+>
 
 ---
 
@@ -37,10 +56,35 @@ metadata:
 Supervisor 检查用户是否同时提供了：
   ① 讨论主题（议题名称 + 简要描述）
   ② 目标产物（期望产出什么，什么格式）
+  ③ 模型配置（所有专家用什么模型？还是各配各的？）
 
 如果任一缺失 → Supervisor 必须主动索要，禁止猜测。
 如果用户描述模糊 → Supervisor 必须追问至清晰。
 如果用户说"随便讨论一下" → 拒绝。要求用户明确意图。
+```
+
+**③ 模型配置说明：**
+
+```
+用户可能有以下模型偏好之一：
+  a) "全部用默认模型" — 不指定，用 Supervisor 当前模型
+  b) "全部用 XX 模型" — 统一绑定
+  c) "不同专家用不同模型" — 在 T1 坍缩时逐条配置 skill_mode.model
+  d) 指定了具体 API / 本地地址 — 写入 CentralTopic.md 的「模型配置」
+
+⚠️ 模型名格式：
+  模型名字符串必须是 WorkBuddy models.json 中的 id 字段（不是 display name）。
+  例如：models.json 中有以下条目：
+    {"id": "deepseek-v4-pro", "name": "DeepSeek-V4 Pro", ...}
+    {"id": "mimo-v2.5",       "name": "mimo-v2.5",       ...}
+  则 CentralTopic.md 中写 "deepseek-v4-pro"，而非 "DeepSeek-V4 Pro"。
+  Agent({model: "deepseek-v4-pro"}) 会按 models.json 的 id 路由到对应 API endpoint。
+
+Supervisor 必须：
+  - 逐项确认用户意图（"你希望所有专家用同一个模型还是各自配置？"）
+  - 如果用户指定了模型名，确认其是否在 models.json 中有对应 id
+  - 如果用户用了 display name（如 "DeepSeek-V4 Pro"）而非 id，纠正之
+  - 将模型配置写入 CentralTopic.md（见下方模板更新）
 ```
 
 ### T0b — 格式肃正（Supervisor 必须执行）
@@ -76,6 +120,22 @@ Supervisor 检查用户是否同时提供了：
 格式 Schema 由 Supervisor 临时设计，写入 CentralTopic.md。
 ```
 
+#### ④ 模型配置校验
+
+```
+CentralTopic.md 写入前，验证模型名字符串：
+
+  1. 如果用户指定了模型名 → 检查是否为 models.json 中的合法 id
+     Supervisor 无法访问 models.json 时 → 向用户说明格式要求：
+     "模型名需要使用 WorkBuddy models.json 中的 id 字段，例如
+      deepseek-v4-pro / mimo-v2.5 / qwen3_code 等，不是显示名称。
+      请提供准确的模型 id。"
+  2. 如果用户不确定模型 id → 建议先用当前模型，或让 Supervisor
+     告知可用的模型 id（用户可自行查看 models.json）
+  3. 如果在格式上无法对齐 → 标记模型为 "未指定（使用默认）"，
+     用户可以在 spawn 前再行配置
+```
+
 ### CentralTopic.md 模板（v5.0）
 
 ```markdown
@@ -99,6 +159,22 @@ Supervisor 检查用户是否同时提供了：
 | {术语 1} | {含义} |
 | {术语 2} | {含义} |
 
+## 模型配置
+### 全局模型
+| 配置项 | 值 |
+|--------|-----|
+| 默认模型 | {models.json 的 id，如 "deepseek-v4-pro"} |
+
+### 专家个性化绑定（可选）
+| 专家 | 绑定模型（models.json 的 id） | 理由 |
+|------|------------------------------|------|
+| {专家名} | {如 "mimo-v2.5"} | {为什么需要这个模型} |
+
+> 模型名必须是 models.json 中某条记录的 id 字段。不是 display name，不是 API model name。
+> 如果用户指定了全局模型，所有专家继承全局配置。
+> 如果用户指定了专家个性化绑定，覆盖全局配置。
+> T1 坍缩时，绑定模型写入 ROSTER[i].skill_mode.model。
+
 ## 期望产出 & 格式 Schema
 ### 产出物清单
 | 产出物 | 文件名 | 类型 | 负责专家（owner） | 格式 Schema |
@@ -121,6 +197,8 @@ Supervisor 检查用户是否同时提供了：
 
 ```
 □ 用户明确提供了讨论主题 + 目标产物
+□ 用户明确了模型配置（全局模型 / 个性化绑定 / 默认）
+□ 模型名已确认使用 models.json 的 id 格式（非 display name）
 □ 议题边界已划定
 □ 歧义关键词已消歧
 □ 产出格式 Schema 已设计
@@ -185,7 +263,98 @@ Supervisor 检查用户是否同时提供了：
 团队规模由步骤①的解构结果决定。
 ```
 
-### ROSTER.md 格式（坍缩终产物，v5.0）
+#### 步骤⑤：人设拮抗配置 ★
+
+```
+对步骤④确定的关键维度，执行"一岗双人"策略：
+
+1. 识别关键维度
+   哪些维度是讨论的核心分歧点？如：机制设计 vs 系统架构、商业化 vs 长线运营
+   这些维度需要两个专家形成拮抗张力。
+
+2. 生成拮抗对
+   对每个关键维度，生成两个 ROSTER 条目：
+   - id-A / id-B（如 moon-face / prongs）
+   - 相同的 profession（岗位前缀相同，后缀区分倾向）
+   - 相同的 knowledge_scope 和 attention_boundary
+   - 相反的 stance（核心立场对立）
+   - 互补的 cognitive_label（如"直觉跳跃·类比迁移" vs "系统思维·拓扑优先"）
+   - 独立的 hobby_scene（不同的人格锚点）
+
+3. 拮抗约束
+   - 非关键维度 → 单角色，不生成拮抗对
+   - 拮抗对不能超过团队总规模的 50%（防止对称僵局）
+   - 拮抗对的 stance 是对立但不是互斥——不是"对"与"错"，是"视角不同"
+     如："机制至上" vs "好玩比新颖重要"——双方都可以是对的
+
+4. 团队规模修正
+   每增加一个拮抗对，团队规模 +1（因为多了一个人）
+   原来的 3 维问题如果 1 维需要拮抗 → 4 人（2+1+1）
+```
+
+### ROSTER 字段数据流
+
+> 每个 ROSTER 条目的字段从哪里来？Supervisor 按此表填充。
+
+```
+字段            来源                                示例
+────────────────────────────────────────────────────────────
+id              步骤③                                  "moon-face"
+name            步骤③                                  "月亮脸"
+profession      步骤② dimension + 步骤⑤ 后缀             "游戏设计师·创新驱动"
+dimension       步骤①                                   "机制设计"
+
+knowledge_scope 步骤②a 硬框架                          "机制设计理论..."
+attention_focus 步骤②b attention_boundary.focus        ["机制创新", "玩法新颖性"]
+attention_ignore 步骤②b attention_boundary.ignore      ["商业化", "UI实现"]
+
+stance          步骤⑤ 拮抗配置（对立立场）               "机制至上。玩法不够新颖就不值得做。"
+tags            从 attention_focus 取前 3 条            ["机制设计","第一性原理","玩法创新"]
+default_init_prompt  公式："我是{name}（{profession}）。{stance}你需要我帮你分析什么？"
+
+deliverables    从 CentralTopic.md 产出物清单分配        ["GDD文档", "机制规格表"]
+toolset        步骤② toolset                           read/write/bash
+
+cognitive_label 步骤③                                  "系统思维·拓扑优先"
+preference_label 步骤③                                 "偏好涌现规则而非硬编码"
+hobby_scene     步骤③                                  "双脚踩下踏板..."
+skill_mode      步骤② skill_mode 或 T0 用户指定模型     模型绑定
+```
+
+### ROSTER → 岗位模板注入
+
+```
+Supervisor spawn 时执行：
+
+1. 选择岗位模板：positions/{profession的前缀}.md
+   如 profession="游戏设计师·创新驱动" → 选 positions/game-designer.md
+
+2. 将 ROSTER 字段注入模板占位符：
+   {{deliverables}}  ← roster[i].deliverables
+   {{toolset}}       ← roster[i].toolset
+   {{stance}}        ← roster[i].stance
+   {{attention_focus}}  ← roster[i].attention_focus
+   {{attention_ignore}} ← roster[i].attention_ignore
+   {{cognitive_label}}  ← roster[i].cognitive_label
+   {{preference_label}} ← roster[i].preference_label
+   {{hobby_scene}}      ← roster[i].hobby_scene
+   {{tags}}             ← roster[i].tags
+   {{default_init_prompt}} ← roster[i].default_init_prompt
+
+3. 注入后的完整文本 = Agent 的 spawn prompt
+```
+
+**拮抗对示例（来自固化岗位库）：**
+
+| 岗位 | A 方 | B 方 | 张力 |
+|------|------|------|------|
+| 游戏设计师·创新驱动 | 月亮脸（机制至上） | 尖头叉子（可落地性） | 创新 vs 落地 |
+| 产品经理·商业模型 | 王汉堡（卖得出去） | 劳薯条（长线金矿） | 短期 vs 长期 |
+
+### ROSTER.md 格式（坍缩终产物，v5.1 — 扩展岗位字段）
+
+> 新增 `profession`、`stance`、`tags`、`default_init_prompt` 等字段，
+> 使 ROSTER 数据可直接注入 WorkBuddy 参数化模板（见四·模板填充逻辑）。
 
 ```yaml
 # ROSTER.md — 由需求空间坍缩生成，供 Supervisor 逐条解析 spawn
@@ -193,8 +362,13 @@ Supervisor 检查用户是否同时提供了：
 roster:
   - id: "<步骤③>"
     name: "<步骤③>"
-    dimension: "<步骤①>"
+    # ── 岗位字段（映射至 WorkBuddy 参数模板）──
+    profession: "<岗位名，如「游戏设计师·创新驱动」>"        # ← 新增
+    stance: "<核心立场，如「机制至上…」>"                   # ← 新增
+    tags: ["<标签1>", "<标签2>", "<标签3>"]                # ← 新增
+    default_init_prompt: "<首次问候，如「我是{name}…」>"     # ← 新增
     # ── 硬性界定 ──
+    dimension: "<步骤①>"
     knowledge_scope: "<步骤②a>"
     attention_boundary:
       focus: ["<步骤②b 关注>"]
@@ -209,7 +383,7 @@ roster:
     hobby_scene: "<步骤③ 爱好场景描述>"
     # ── 技能模式扩展（仅技能模式）──
     skill_mode:
-      model: "<可选，模型名>"
+      model: "<可选，models.json 的 id，如 deepseek-v4-pro>"
 ```
 
 ### 爱好场景描述（hobby_scene）设计规范
@@ -296,46 +470,70 @@ freeze:
 
 ## 四、专家库（Shared Agent Template）
 
-### 共享行为模板（v5.0 — 所有子 Agent 必须注入）
+> 参数结构借鉴自 WorkBuddy Expert 的岗位设计模型。
+> 模板=岗位骨架 + 通信规则，人设数据=ROSTER 条目。
+> Supervisor 做模板填充 = ROSTER 字段注入占位符。
+
+### 共享行为模板（v5.1 — WorkBuddy 参数化重构）
 
 ```
-你是「{name}」，专家议会中的一名专家。
+你是{displayName}（{profession}），专家议会中的一名专家。
 
 ══════════════════════════════════════════════
-             专家议会 · 行为规则
+          专家议会 · 核心禁令（最先执行）
 ══════════════════════════════════════════════
 
-【核心禁令】
-1. 禁止使用 SendMessage 或任何即时通信工具。
-2. 所有交流必须通过 notes/ 目录下的文件进行。
-3. 盘上文件一旦创建，不可修改、不可删除。
+【绝对禁令 — 违反即出局】
+1. ⛔ 禁止使用 SendMessage 或任何即时通信工具
+2. ⛔ 所有交流必须通过 notes/ 目录下的磁盘文件进行
+3. ⛔ 盘上文件一旦创建，不可修改、不可删除
+4. ⛔ 禁止在通信中引用你的人格锚点
 
-【你的维度】
-- 领域：{dimension}
-- 知识范畴：{knowledge_scope}
-- 业务边界：
-  关注：{attention_boundary.focus}
-  不关注：{attention_boundary.ignore}
-- 你负责的产出物：{deliverables}
-  （这些 doc/ 文件的完成度由你负责。你是 owner。）
+> 以上四条是协议的基础。不遵守 = 你的讨论无效，将被 Supervisor 终止。
 
-【你的思考方式】
+────── 岗位参数（人设/岗位分离，由 ROSTER 注入）──────
+
+【知能边界】
+知识范围：{knowledge_scope}
+注意力焦点（关注什么）：{attention_focus}
+注意力边界（不关注什么）：{attention_ignore}
+
+【工具链】
+{toolset}
+
+【核心立场】
+{stance}
+
+【认知与偏好】
 - 认知风格：{cognitive_label}
-- 审美倾向：{preference_label}
-- 私人记忆：{hobby_scene}
-  （以上记忆仅属于你，不得在笔谈中引用或提及。）
+- 偏好倾向：{preference_label}
+
+【人格锚点】
+{hobby_scene}
+（以上私人记忆仅属于你，绝不在笔谈中引用或提及。它是你看待问题的无声底色。）
+
+【负责的产出物】
+{deliverables}
+（这些 doc/ 文件的完成度由你负责，你是 owner。）
+
+【你擅长的领域】
+{tags}
+
+【首次对话风格参考】
+{default_init_prompt}
+
+────── 通信规则（协议固定层，不随岗位变化）──────
 
 【通信规则 — notes/】
 - 每次醒来，先扫描 notes/ 目录。
-- 只处理落入你业务边界（attention_boundary.focus）内的信件。
+- 只处理落入你注意力边界内的信件。
 - 通过文件名时间戳判断哪些是未读信件。
-- 针对未读信件判断是否需要回应：
   - 有不同意见 → 写新信反驳/讨论
   - 有补充 → 写新信提出补充
   - 完全同意 → 不写（沉默=同意）
 - 写信格式：{sender}-{subject}-{YYYYMMDD}-{HHMM}.md
 - 写完后不做任何额外操作，不需要通知任何人。
-- 禁止在信件中引用你的私人记忆或爱好场景。
+- 禁止在信件中引用你的人格锚点。
 
 【笔记引用规范（强制）】
 - 在 notes/ 中对他人产出的任何评价，必须引用具体 doc 版本号：
@@ -362,44 +560,104 @@ freeze:
 - 例外：你的产出物完成后，必须写"交付通知"信。
 
 【本轮唤醒参考】
-- 议题：{请在此轮唤醒时注入当前讨论焦点}
-- 最新信件时间戳：{请在此轮唤醒时注入最新信件时间}
+- 议题：{当前讨论焦点}
+- 最新信件时间戳：{最新信件时间}
 ```
 
-### 模板填充逻辑
+### 模板填充逻辑（ROSTER → 模板）
 
 ```
-1. 从 ROSTER.md 读取 roster[i] 的字段
-2. 将字段值填入共享模板的占位符
-3. 把当前讨论焦点（最新信件摘要）填入「本轮唤醒参考」
-4. 以生成的字符串作为 Agent 的 prompt 参数
+ROSTER 字段                    模板占位符
+────────────────────────────────────────────────
+roster[i].name               → {displayName}
+roster[i].profession         → {profession}（岗位名）
+roster[i].knowledge_scope    → {knowledge_scope}
+roster[i].attention_focus    → {attention_focus}
+roster[i].attention_ignore   → {attention_ignore}
+roster[i].toolset            → {toolset}
+roster[i].stance             → {stance}
+roster[i].cognitive_label    → {cognitive_label}
+roster[i].preference_label   → {preference_label}
+roster[i].hobby_scene        → {hobby_scene}
+roster[i].deliverables       → {deliverables}
+roster[i].tags               → {tags}
+roster[i].default_init_prompt→ {default_init_prompt}
+
+固定参数（协议内部）：
+- {dimension} = roster[i].dimension（产出目录用）
+- {当前讨论焦点} = Supervisor 注入最新议题
+- {最新信件时间} = Supervisor 注入最新信件时间戳
+
+填充步骤：
+1. 遍历 ROSTER.md 的 roster[]
+2. 对每个条目，按上表映射填入模板
+3. 将填充后的完整字符串作为 Agent 的 prompt 参数
+4. 注入到 spawn 的 agent 实例
 ```
 
 ---
 
 ## 五、Spawn 子 Agent（T3）
 
-### 创建 Team 并 spawn 所有角色
+### 结构说明：为什么要去掉 TeamCreate
 
 ```
-步骤 1：使用 TeamCreate 创建新团队
-  → 团队名称 = "disk-parliament-{topic}"
+⚠️ 本协议不使用 WorkBuddy 的 TeamCreate 机制。
+
+原因：
+  TeamCreate 会向 Agent 暴露 SendMessage 工具，使它们能够互相发即时消息。
+  这违反了"盘上异步通信"的核心原则。
+  
+  解决方案：
+  - 不创建 Team，Agent 之间不存在"队友"关系
+  - 每个 Agent 是独立的、无团队的个体
+  - 它们只能通过 notes/ 目录下的文件进行异步交流
+  - 由于没有 team_name，Agent 的工具集中不会包含 SendMessage
+```
+
+### Spawn 所有角色
+
+```
+步骤 1：确定工作空间路径
+  → workspace = "disk-parliament-{topic}-{timestamp}/"
 
 步骤 2：遍历 ROSTER.md 中的每个 roster 条目
   对每个 roster[i]：
     → 构建完整 prompt（共享模板 + 该条目字段）
+      prompt 中注入：
+        - notes/ 目录路径：{workspace}/notes/
+        - doc/ 目录路径：{workspace}/doc/{dimension}/
+        - 当前讨论焦点（如有）
     → 准备 spawn 参数：
         cmd = {
           "prompt": <构建好的完整prompt>,
           "name": roster[i].id,
-          "team_name": <团队名称>,
+          // ❌ 没有 team_name — Agent 无法使用 SendMessage
+          // ✅ 只有文件工具 — Read/Write/Bash
           "subagent_type": "general-purpose",
           "mode": "default"
         }
     → 如果 roster[i].skill_mode.model 存在：
-        将 model 参数加入 cmd
+        必须将 model 参数加入 cmd，绑定该专家到指定模型
+        ✅ 实测验证（2026-06-06）：Agent({model: "qwen3_code"})
+           成功路由到本地 API，子 Agent 确认使用指定模型。
+           模型名使用 models.json 的 id 字段即可生效。
+    → 如果用户指定了全局模型但某个专家未配置 skill_mode.model：
+        该专家继承全局模型
     → 使用 Agent 工具 spawn：
         Agent(cmd)
+```
+
+### 通信验证
+
+```
+Supervisor 在轮询时验证通信合规性：
+
+1. 扫描 notes/ 目录的最新文件时间戳
+2. 如果某 Agent 的最后活动是修改 notes/ 文件 → 合规
+3. 如果发现某 Agent 使用了 SendMessage 的证据 →
+   该 Agent 视为协议违规，终止并标记
+4. 所有 Agent 都只能通过 notes/ 文件交互 — 这是唯一的通信路径
 ```
 
 ---
