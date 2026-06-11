@@ -1,0 +1,144 @@
+# toolbox-types.yaml — 7阶段 × 5模态 工具白名单矩阵
+# 版本: v1.0
+# 日期: 2026-06-09
+# 用途: 从 Duty 的 (stage, modalities) 自动推导 builtins 白名单
+
+# ============================================================
+# 0. 阶段与模态定义
+# ============================================================
+meta:
+  version: "1.0"
+  model: "WHAT — WHERE(stage) × HOW(modality) × WHAT(boundary)"
+  derived_from: "Skill/11-duty-what-model.md"
+
+stages:
+  S1: { name: "产生灵感", desc: "从空白到有想法，方向的起点" }
+  S2: { name: "确定方向", desc: "从众多可能中择一，划定边界" }
+  S3: { name: "冒出点子", desc: "在方向上生成具体方案胚胎" }
+  S4: { name: "补完创意", desc: "填充细节，让方案可被执行" }
+  S5: { name: "计算内容", desc: "量化、模拟、验证方案可行性" }
+  S6: { name: "精算框架", desc: "建立约束条件、架构规则、系统边界" }
+  S7: { name: "部署实施", desc: "将框架落为可运行/可交付的产物" }
+
+modalities:
+  perceiver:   { symbol: "🕵️", name: "对外感知", desc: "获取外部世界信号（搜索、阅读、采样）" }
+  deducer:     { symbol: "🧮", name: "内部推导", desc: "在已有材料中推演结论（计算、验证、推理）" }
+  synthesizer: { symbol: "✍️", name: "综合写作", desc: "从碎片产出结构化成果（撰写、整理、归纳）" }
+  critic:      { symbol: "🔍", name: "批判验证", desc: "挑错、补漏、压力测试（审稿、质疑、否定）" }
+  diverger:    { symbol: "💡", name: "创意发散", desc: "跳出框架，探索盲区（脑暴、替代方案、破局）" }
+
+# ============================================================
+# 1. 工具族定义（引用自 WorkBuddy Tools Reference）
+# ============================================================
+tool_families:
+  reader:
+    desc: "只读探索"
+    tools: [Read, Glob, Grep]
+  editor:
+    desc: "创建/修改内容"
+    tools: [Write, Edit, MultiEdit, NotebookEdit]
+  searcher:
+    desc: "联网研究"
+    tools: [WebSearch, WebFetch]
+  executor:
+    desc: "命令执行"
+    tools: [Bash, PowerShell]
+  intellisense:
+    desc: "代码智能 / 技能加载"
+    tools: [LSP, ToolSearch, Skill]
+
+# baseline: 所有岗位都有 Read + Write（最低读写权）
+baseline:
+  builtins: [Read, Write]
+  skills: []
+
+# ============================================================
+# 2. 7×5 工具矩阵
+#    格式: matrix[S{stage_num}][{modality}] = { builtins: [...], skills: [...] }
+#    "—" 表示无额外工具需求（只有 baseline）
+# ============================================================
+matrix:
+  S1:  # 产生灵感
+    perceiver:   { builtins: [WebSearch, WebFetch], skills: [] }
+    deducer:     { builtins: [], skills: [] }
+    synthesizer: { builtins: [], skills: [] }
+    critic:      { builtins: [], skills: [] }
+    diverger:    { builtins: [WebSearch], skills: [] }
+
+  S2:  # 确定方向
+    perceiver:   { builtins: [WebSearch, WebFetch], skills: [] }
+    deducer:     { builtins: [Glob, Grep, ToolSearch], skills: [] }
+    synthesizer: { builtins: [Edit], skills: [] }
+    critic:      { builtins: [Glob, Grep], skills: [] }
+    diverger:    { builtins: [], skills: [] }
+
+  S3:  # 冒出点子
+    perceiver:   { builtins: [WebSearch], skills: [] }
+    deducer:     { builtins: [], skills: [] }
+    synthesizer: { builtins: [Edit], skills: [] }
+    critic:      { builtins: [Glob, Grep], skills: [] }
+    diverger:    { builtins: [WebSearch], skills: [] }
+
+  S4:  # 补完创意
+    perceiver:   { builtins: [], skills: [] }
+    deducer:     { builtins: [Glob, Grep, ToolSearch], skills: [] }
+    synthesizer: { builtins: [Edit], skills: [] }
+    critic:      { builtins: [], skills: [] }
+    diverger:    { builtins: [WebSearch], skills: [] }
+
+  S5:  # 计算内容
+    perceiver:   { builtins: [], skills: [] }
+    deducer:     { builtins: [Glob, Grep, Bash, LSP], skills: [] }
+    synthesizer: { builtins: [Edit, NotebookEdit], skills: [] }
+    critic:      { builtins: [Bash, LSP], skills: [] }
+    diverger:    { builtins: [], skills: [] }
+
+  S6:  # 精算框架
+    perceiver:   { builtins: [], skills: [] }
+    deducer:     { builtins: [Glob, Grep, Bash, LSP], skills: [] }
+    synthesizer: { builtins: [Edit], skills: [] }
+    critic:      { builtins: [Glob, Grep, Bash], skills: [] }
+    diverger:    { builtins: [], skills: [] }
+
+  S7:  # 部署实施
+    perceiver:   { builtins: [], skills: [] }
+    deducer:     { builtins: [Glob, Grep, Bash, LSP, ToolSearch], skills: [] }
+    synthesizer: { builtins: [Edit, MultiEdit], skills: [] }
+    critic:      { builtins: [], skills: [] }
+    diverger:    { builtins: [], skills: [] }
+
+# ============================================================
+# 3. 推导函数（伪代码）
+#    实际推导逻辑落地在 scripts/assemble_agent.py
+# ============================================================
+derive:
+  description: |
+    从 Duty 的 (stage, modalities, attention_boundary) 推导最终 toolset。
+
+    toolset = baseline.builtins
+            ∪ ∪_{m ∈ modalities} matrix[stage][m].builtins
+            ∩ attention_boundary_filter(exclude)
+
+    如果 exclude 包含 "代码实现":
+        toolset -= {Edit, Bash, LSP, ToolSearch, MultiEdit, NotebookEdit}
+    如果 exclude 包含 "外部搜索":
+        toolset -= {WebSearch, WebFetch}
+    如果 exclude 包含 "文件创建":
+        toolset -= {Write, MultiEdit, NotebookEdit}
+
+  example:
+    input:
+      stage: S5
+      modalities: [deducer, synthesizer, critic]
+      attention_boundary_exclude: []                     # 无排除
+    step1_baseline: [Read, Write]
+    step2_union_modalities:
+      - [Glob, Grep, Bash, LSP]          # S5 × deducer
+      - [Edit, NotebookEdit]              # S5 × synthesizer
+      - [Bash, LSP]                       # S5 × critic
+    step3_merge:
+      builtins: [Read, Write, Glob, Grep, Bash, LSP, Edit, NotebookEdit]
+      skills: []
+    output:
+      builtins: [Read, Glob, Grep, Write, Edit, NotebookEdit, Bash, LSP]
+      skills: []

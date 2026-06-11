@@ -1,4 +1,4 @@
-# 专家议会（DiskParliament）v5.0
+# 专家议会（DiskParliament）v3.0
 
 > AI 专家团听起来很美。但你试过就知道——他们聊着聊着就跑偏了、产出的文档是幻觉、出错了你根本不知道谁说了什么、最后还得你自己重新写一遍。
 >
@@ -67,6 +67,32 @@
 | 还得你手动盯着 | Supervisor **自动运营**：轮询唤醒 + 收敛判定 + 冻结，你睡一觉起来看结果 |
 | 框架太重，装半天 | 一共 **5 个文件**，装上去就能跑 |
 | 所有专家用同一个模型，贵的太贵、便宜的太笨 | 每个专家可以**绑不同的模型**——复杂推理用高算力，工具操作用轻量模型。Skill 自动传递 model 参数到 spawn 命令 |
+| AI 按"功能维度"召集专家，变成流水线 | **v3.0 WHAT 模型**——按阶段-模态匹配岗位，并发启动，自然回溯 |
+
+---
+
+## v3.0 核心升级：根除流水线
+
+v2.x 的问题：AI 按"功能维度"（机制设计→数值计算→技术架构→代码实现）拆解任务，
+天然产生串行工序链——A 做完→B 消费→C 等待。这不是团队，这是传送带。
+
+v3.0 的答案：**WHAT 模型**——7 工作阶段 × 5 认知模态。
+
+```
+议题：GDD 研讨会
+  │
+  ├── S1 灵感 × [perceiver, diverger] → 匹配 creative-planner
+  ├── S3 点子 × [perceiver, diverger, synthesizer] → 匹配 mechanics-designer
+  ├── S5 计算 × [deducer, critic] → 匹配 balance-designer
+  ├── S6 框架 × [deducer, critic] → 匹配 framework-architect
+  └── S7 实施 × [deducer, synthesizer] → 匹配 developer
+
+所有人并发启动，同时看 CentralTopic，各自从所在阶段发言。
+S7 可以在 T0 就直接说"你这个点子我跑不通"。
+回溯不需要协议指令——盘上通信的自然涌现。
+```
+
+22 个预定义岗位，自带 stage×modality×antagonists，Toolset 从 7×5 矩阵自动推导。
 
 ---
 
@@ -130,15 +156,26 @@ cp -r disk-parliament/ ~/.workbuddy/skills/disk-parliament/
 ```
 disk-parliament/
 ├── README.md
-├── SKILL.md           ← WorkBuddy Skill 定义（v2.0）
-└── scripts/
-    ├── init-workspace.py
-    └── parse-roster.py
+├── SKILL.md                  ← WorkBuddy Skill 定义（v3.0）
+├── scripts/
+│   ├── init-workspace.py
+│   └── parse-roster.py
+└── duties/
+    ├── DUTY-INDEX.yaml       ← 22 个预定义岗位
+    ├── toolbox-types.yaml    ← 7×5 toolset 矩阵
+    └── *.yaml                ← 样板岗位
 ```
 
-五个文件。装上去就能跑。想看协议设计的完整细节？翻 SKILL.md 本身——协议定义即文档。
-
 ---
+
+## 版本历史
+
+| 版本 | 日期 | 变更 |
+|------|------|------|
+| **v3.0** | 2026-06-12 | WHAT 模型集成：7阶段×5模态，22岗位自动匹配，并发盘上通信 |
+| v2.2 | 2026-06-06 | 岗位系统、人设拮抗、模型绑定 |
+| v2.0 | 2026-05-25 | 双形态工作流、ROSTER 坍缩 |
+| v1.0 | 2026-05-24 | 初始版本：盘上异步通信协议 |
 
 ## License
 

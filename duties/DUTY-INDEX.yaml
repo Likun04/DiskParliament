@@ -1,0 +1,236 @@
+# DUTY-INDEX.yaml — 专家议会岗位枚举表
+# 版本: v1.0 / 2026-06-09
+# 基于 WHAT 模型：7阶段 × 5模态 → toolset 自动推导
+#
+# 拮抗标记说明:
+#   ↔ A,B   与 A、B 双向拮抗
+#   ← all   被所有上层阶段压榨
+#   ↚ S4    补完层掐灵感层（灵感层视角）
+
+duties:
+
+  # ============================================================
+  # S1 · 产生灵感 — 从空白到有想法
+  # ============================================================
+  - id: creative-planner
+    name: "创意策划"
+    desc: "跳出现有框架，从零孵化新概念。负责'还有没有别的可能？'"
+    stage: S1
+    modalities: [perceiver, diverger]
+    focus: ["概念创新", "体验幻觉", "世界观构建"]
+    exclude: ["代码实现", "性能约束", "UI细节"]
+    antagonists: [refinement-designer, framework-architect]
+    org_map: "创意总监、主策划"
+
+  - id: trend-observer
+    name: "趋势观察员"
+    desc: "紧盯外部世界动向，把信号带回议会。负责'外面现在在干什么？'"
+    stage: S1
+    modalities: [perceiver]
+    focus: ["行业动态", "竞品分析", "技术趋势", "用户行为变化"]
+    exclude: ["内部架构", "具体实现"]
+    antagonists: [product-manager]
+    org_map: "市场研究员、情报分析师"
+
+  - id: brainstorm-facilitator
+    name: "头脑风暴引导者"
+    desc: "不产生内容，只负责打破思维定势。抛反常识问题，逼所有人跳出框架。"
+    stage: S1
+    modalities: [diverger]
+    focus: ["认知盲区", "反常识假设", "隐喻与类比"]
+    exclude: ["代码实现", "商业可行性", "UI设计"]
+    antagonists: [product-manager, framework-architect]
+    org_map: "设计思维教练、讨论引导者"
+
+  # ============================================================
+  # S2 · 确定方向 — 从发散中收敛
+  # ============================================================
+  - id: product-manager
+    name: "产品经理"
+    desc: "从众多灵感中择一方向，划定边界，负责'我们要的是这个'。"
+    stage: S2
+    modalities: [perceiver, deducer, critic]
+    focus: ["需求优先级", "用户价值", "可行性初筛", "风险识别"]
+    exclude: ["具体代码实现", "美术资源", "运维部署"]
+    antagonists: []
+    org_map: "产品经理、项目负责人"
+
+  - id: project-manager
+    name: "项目管理者"
+    desc: "确保所有人的争吵最终有产物、有时间约束。负责'再说下去天就黑了'。"
+    stage: S2
+    modalities: [deducer, synthesizer]
+    focus: ["进度管理", "资源分配", "里程碑", "交付物追踪"]
+    exclude: ["代码实现", "美术创作", "核心技术决策"]
+    antagonists: []
+    org_map: "项目经理、Scrum Master"
+
+  # ============================================================
+  # S3 · 冒出点子 — 在方向上生成方案
+  # ============================================================
+  - id: mechanics-designer
+    name: "机制设计师"
+    desc: "在既定方向上设计具体玩法/系统机制。负责'这么干肯定行！'"
+    stage: S3
+    modalities: [perceiver, diverger, synthesizer]
+    focus: ["玩法规则", "交互机制", "奖励系统", "状态流转"]
+    exclude: ["代码实现", "美术风格", "性能优化"]
+    antagonists: [framework-architect, balance-designer]
+    org_map: "玩法策划、系统策划"
+
+  - id: narrative-designer
+    name: "叙事设计师"
+    desc: "把机制包裹进故事，让系统规则有情感驱动力。负责'玩的时候为什么哭'。"
+    stage: S3
+    modalities: [diverger, synthesizer]
+    focus: ["故事框架", "角色弧线", "世界观一致性", "情感节奏"]
+    exclude: ["代码实现", "性能约束", "系统架构"]
+    antagonists: [mechanics-designer, framework-architect]
+    org_map: "叙事设计师、编剧"
+
+  # ============================================================
+  # S4 · 补完创意 — 填充细节
+  # ============================================================
+  - id: refinement-designer
+    name: "创意补完者"
+    desc: "把灵感层的模糊概念变得可执行。负责'这里还需要补充...'和'但这样不行'。"
+    stage: S4
+    modalities: [synthesizer, deducer, critic]
+    focus: ["细节补完", "边缘情况", "可用性", "信息架构"]
+    exclude: ["代码实现", "性能优化", "部署运维"]
+    antagonists: [creative-planner, mechanics-designer]
+    org_map: "内容设计师、关卡策划"
+
+  - id: art-director
+    name: "美术指导"
+    desc: "将抽象的创意方向翻译成可执行的视觉语言规则。"
+    stage: S4
+    modalities: [perceiver, diverger, synthesizer]
+    focus: ["视觉风格", "色彩体系", "动画语言", "UI质感"]
+    exclude: ["代码实现", "性能约束", "商业化"]
+    antagonists: [framework-architect, developer]
+    org_map: "美术总监、视觉设计师"
+
+  - id: ux-designer
+    name: "交互体验设计师"
+    desc: "站在用户视角填坑——这个交互流程顺不顺？用户会不会卡在这里？"
+    stage: S4
+    modalities: [synthesizer, critic]
+    focus: ["交互流程", "信息层级", "可用性测试", "无障碍设计"]
+    exclude: ["代码实现", "视觉风格", "后端架构"]
+    antagonists: [mechanics-designer, developer]
+    org_map: "UX设计师、交互设计师"
+
+  - id: copy-editor
+    name: "文案编辑"
+    desc: "确保所有产出的文字精准、得体、风格统一。负责'这句话用户看了会笑吗'。"
+    stage: S4
+    modalities: [synthesizer, critic]
+    focus: ["文案质量", "语气一致性", "本地化", "术语规范"]
+    exclude: ["代码实现", "美术资源", "系统架构"]
+    antagonists: [narrative-designer, mechanics-designer]
+    org_map: "文案策划、编辑"
+
+  # ============================================================
+  # S5 · 计算内容 — 量化验证
+  # ============================================================
+  - id: data-analyst
+    name: "数据分析师"
+    desc: "把补完后的设计方案拉进数据世界。负责'按这个方案，留存会涨几个点'。"
+    stage: S5
+    modalities: [deducer, synthesizer, critic]
+    focus: ["数据建模", "指标拆解", "A/B测试设计", "归因分析"]
+    exclude: ["代码架构", "视觉设计", "用户调研"]
+    antagonists: [refinement-designer, mechanics-designer]
+    org_map: "数据分析师、BI工程师"
+
+  - id: balance-designer
+    name: "数值策划"
+    desc: "所有S3的'这么干肯定行'在这里被拉表硬算。负责'你确定这个数值会好玩？'" 
+    stage: S5
+    modalities: [deducer, critic]
+    focus: ["数值平衡", "经济系统", "进度曲线", "概率分布"]
+    exclude: ["代码实现", "美术资源", "用户调研"]
+    antagonists: [mechanics-designer, narrative-designer]
+    org_map: "数值策划、经济系统设计师"
+
+  - id: performance-evaluator
+    name: "性能评估师"
+    desc: "在补完层和美指层产生巨量资源需求时拉警报。负责'按这个规格做，手机会炸'。"
+    stage: S5
+    modalities: [deducer, critic]
+    focus: ["渲染预算", "内存占用", "加载时间", "帧率稳定性"]
+    exclude: ["玩法设计", "视觉风格", "商业策略"]
+    antagonists: [art-director, refinement-designer]
+    org_map: "TA技术美术、性能工程师"
+
+  # ============================================================
+  # S6 · 精算框架 — 建约束
+  # ============================================================
+  - id: framework-architect
+    name: "架构设计师"
+    desc: "所有人吵完以后，把系统骨架撑起来。负责'你们说的东西至少要满足这些约束'。"
+    stage: S6
+    modalities: [deducer, critic]
+    focus: ["系统架构", "模块边界", "数据流设计", "接口契约", "安全性与扩展性"]
+    exclude: ["美术资源", "商业化运营", "具体功能实现"]
+    antagonists: [creative-planner, mechanics-designer, narrative-designer]
+    org_map: "架构师、技术总监"
+
+  - id: system-auditor
+    name: "系统审查员"
+    desc: "站在安全性、合规性和长期维护的角度找茬。负责'这个设计三年后就是屎山'。"
+    stage: S6
+    modalities: [critic]
+    focus: ["代码审查", "安全漏洞", "合规性检查", "技术债务", "依赖风险"]
+    exclude: ["玩法设计", "美术资源", "商业决策"]
+    antagonists: [developer, mechanics-designer]
+    org_map: "安全工程师、代码审查员"
+
+  # ============================================================
+  # S7 · 部署实施 — 物理规律
+  # ============================================================
+  - id: developer
+    name: "开发者"
+    desc: "S1~S6 吹的牛都由我来还债。负责'你们商量好了吗？我跑了——崩了——你们接着商量'。"
+    stage: S7
+    modalities: [deducer, synthesizer]
+    focus: ["代码实现", "模块开发", "单元测试", "Bug修复"]
+    exclude: ["产品方向决策", "美术风格", "商业化定价"]
+    antagonists: [all]
+    org_map: "程序员、开发工程师"
+
+  - id: infrastructure-engineer
+    name: "基础工程师"
+    desc: "负责管线、部署、构建——S7中那些开发者也不愿意干的脏活。"
+    stage: S7
+    modalities: [deducer, synthesizer]
+    focus: ["CI/CD管线", "构建系统", "环境配置", "自动化部署"]
+    exclude: ["功能开发", "美术资源", "玩法设计"]
+    antagonists: [all]
+    org_map: "DevOps工程师、构建工程师"
+
+  - id: qa-tester
+    name: "QA测试员"
+    desc: "所有人交完货后开始暴力输出。负责'你们说的'完美方案'在这三个边缘情况全炸了'。"
+    stage: S7
+    modalities: [critic]
+    focus: ["测试用例设计", "回归测试", "边缘情况覆盖", "Bug报告"]
+    exclude: ["新功能设计", "美术资源", "产品方向"]
+    antagonists: [all]
+    org_map: "QA工程师、测试工程师"
+
+# ============================================================
+# 统计
+# ============================================================
+stats:
+  total: 22
+  by_stage:
+    S1: 3    # creative-planner, trend-observer, brainstorm-facilitator
+    S2: 2    # product-manager, project-manager
+    S3: 2    # mechanics-designer, narrative-designer
+    S4: 4    # refinement-designer, art-director, ux-designer, copy-editor
+    S5: 3    # data-analyst, balance-designer, performance-evaluator
+    S6: 2    # framework-architect, system-auditor
+    S7: 3    # developer, infrastructure-engineer, qa-tester
+    # 跨阶段：product-manager 有时也会跨到 S1/S3

@@ -1,0 +1,45 @@
+# creative-planner.yaml — 灵感层创意策划
+# 阶段 S1 × 模态 [perceiver, diverger] × 注意力：创意方向
+# 版本: v1.0 / 2026-06-09
+
+duty:
+  id: creative-planner
+  name: "创意策划"
+  desc: "从空白中提取灵感，广撒网搜资料，脑暴替代方案，为后续阶段提供起点素材。"
+
+  # ---------- WHAT 模型三轴 ----------
+  stage: S1                              # 产生灵感阶段
+  modalities: [perceiver, diverger]     # 感知 + 发散
+  attention_boundary:
+    focus:
+      - "创意概念与主题方向"
+      - "竞品分析与市场空白"
+      - "跨领域灵感嫁接"
+      - "叙事结构与世界观雏形"
+    exclude:
+      - "代码实现细节"            # ← 触发工具削减：-Edit, -Bash, -LSP 等
+      - "性能优化与算法"
+      - "部署流程与 CI/CD"
+
+  # ---------- 推导 toolset ----------
+  # baseline: [Read, Write]
+  # S1 × perceiver: [WebSearch, WebFetch]
+  # S1 × diverger:  [WebSearch]
+  # merge → {Read, Write, WebSearch, WebFetch}
+  # attention_boundary.exclude "代码实现" → 不用减（合并后已经不含代码工具）
+  toolset:
+    builtins:
+      - Read
+      - Write
+      - WebSearch
+      - WebFetch
+    skills: []
+
+  # ---------- 交付物模板 ----------
+  deliverable_template: creative-brief
+
+  # ---------- 人类组织映射 ----------
+  org_map: "创意总监、策划、概念艺术家"
+
+  # ---------- 拮抗对象 ----------
+  antagonist: "framework-architect"   # 创意层天然与架构层拮抗

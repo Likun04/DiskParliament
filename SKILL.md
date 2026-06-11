@@ -1,23 +1,31 @@
 ---
 name: disk-parliament
 description: >
-  专家议会 v2.2 — 多 Agent 盘上异步通信协议。Supervisor 自动坍缩需求→生成 ROSTER→
-  spawn 子 Agent（支持逐专家绑定不同模型）→盘上写信→收敛冻结。引入岗位系统（252个固化模板 + 人设拮抗），
-  人设与岗位分离，支持一岗双人拮抗。
-  议题肃正 → 需求坍缩 → 岗位匹配 → 人设拮抗配置 → spawn 子 Agent →
-  盘上 mail 异步通信（禁止 SendMessage）→ 收敛判定 → 冻结产出。
+  专家议会 v3.0 — 多 Agent 盘上异步通信协议。基于 WHAT 模型（7工作阶段×5认知模态）
+  从 DUTY-INDEX 匹配岗位→自动推导 toolset→spawn 子 Agent（支持逐专家绑定不同模型）
+  →并发盘上写信（禁止 SendMessage）→自然停火→收敛冻结。
+  引入岗位系统（22个预定义岗位，自带 stage×modality×antagonists），
+  人格与岗位分离。不再按"功能维度"切分（根除流水线式专家召集），
+  改为按"阶段-模态"映射必要性。
+  议题肃正 → 阶段-模态必要性判定 → 从 DUTY-INDEX 匹配岗位 →
+  toolset 矩阵推导 → spawn 子 Agent（并发启动，不限顺序）→
+  盘上 mail 异步通信 → 收敛判定 → 冻结产出。
   Supervisor 只做轮询唤醒 + 收敛判定，不编排发言顺序。
   触发词：专家议会、盘上议会、开个议会、启动议会、开个讨论组、异步讨论、
   多Agent协作、DiskParliament、异步通信、Protocol启动、专家讨论、
   开个异步会议、角色扮演讨论、多角色碰撞、专家会诊、
   复杂问题分析、话题讨论、团队协作、分工讨论。
 metadata:
-  version: "2.2"
-  protocol_version: "v5.2"
+  version: "3.0"
+  protocol_version: "v6.0-WHAT"
   agent_created: true
+  depends_on:
+    - "ForGithub/duties/DUTY-INDEX.yaml"       # 22岗位枚举
+    - "ForGithub/duties/toolbox-types.yaml"    # 7×5矩阵
+    - "Skill/11-duty-what-model.md"            # WHAT模型推导
 ---
 
-# 专家议会（DiskParliament）v2.2
+# 专家议会（DiskParliament）v3.0
 
 > **核心原则**：多 Agent 通过盘上文件（notes/）异步通信，禁止任何形式的即时对话（SendMessage）。
 > 写出去的文件不可修改，没话说了就不写（自然停火），Supervisor 只做唤醒 + 判定。
@@ -207,118 +215,123 @@ CentralTopic.md 写入前，验证模型名字符串：
 
 ---
 
-## 二、需求空间坍缩（生成 ROSTER.md + PROTOCOL.md）
+## 二、需求空间坍缩 — WHAT 模型匹配（生成 ROSTER.md + PROTOCOL.md）
 
-### T1 — 严格四步坍缩
+### T1 — 三步坍缩（v3.0：阶段-模态映射替代维度切面）
 
 **输入**：CentralTopic.md 内容
 **输出**：ROSTER.md（YAML）+ PROTOCOL.md
+**依赖**：`ForGithub/duties/DUTY-INDEX.yaml` + `ForGithub/duties/toolbox-types.yaml`
 
-#### 步骤①：解构问题域
+> **⚠️ 重要变更 (v3.0)**：不再按"功能维度"切分问题域。按"阶段-模态"映射议题需求。
+> 按功能维度切分（机制设计→数值计算→技术架构→代码实现）天然产生流水线席位 ——
+> 这正是 v2.x 被验证为失败模式的原因。
 
-```
-操作：将用户意图分解为独立的维度切面。
-规则：不预设维度数量。维度数量由问题复杂度决定。
-      不预设维度命名方式。命名从问题域推导。
-```
-
-#### 步骤②：对每个维度生成硬框架
+#### 步骤①：议题的阶段-模态必要性判定
 
 ```
-对步骤①输出的每个 dimension，生成：
-  knowledge_scope:    该维度需要掌握的知识范围（50-200 字）
-  attention_boundary: 业务边界/注意力焦点
-    focus: [该维度关注的话题列表]
-    ignore: [该维度不关注的话题列表]
-  toolset:
-    builtins: [通用工具列表]
-    skills:   [需要加载的专业技能]
-  skill_mode:
-    model:  推荐绑定的模型（可选）
-    对需要高推理或特殊能力的维度，绑定最合适的模型
-    默认用 Supervisor 的模型，不绑也没关系
+操作：分析议题需要哪些工作阶段参与，每个阶段需要哪些认知模态。
+
+不预设维度名称，不预设维度数量。从议题本身推导"需要什么阶段位的人"。
+
+S1 产生灵感 — 需要从外部世界获取信号吗？需要跳出框架吗？
+S2 确定方向 — 需要从众多方向中做收敛决策吗？
+S3 冒出点子 — 需要在方向上生成具体方案吗？
+S4 补完创意 — 需要填充细节让方案可执行吗？
+S5 计算内容 — 需要量化/模拟/验证方案可行性吗？
+S6 精算框架 — 需要建立架构约束和系统边界吗？
+S7 部署实施 — 需要将方案落为可运行产物吗？
+
+对每个阶段：
+  必要性判定 → 需要/不需要
+  如果需要 → 列出所需的认知模态（perceiver / deducer / synthesizer / critic / diverger）
+
+输出示例（GDD研讨会）：
+  S1×[perceiver, diverger]           → 需要创意策划（1人）
+  S2×[perceiver, deducer, critic]    → 需要产品经理（1人）
+  S3×[perceiver, diverger, synthesizer] → 需要机制设计师（1人）
+  S5×[deducer, critic]               → 需要数值策划（1人）
+  S6×[deducer, critic]               → 需要架构设计师（1人）
+  S7×[deducer, synthesizer]          → 需要开发者（1人）
+
+⚠️ 不是每个议题都需要所有7个阶段。阶段必要性由议题性质决定。
+⚠️ 不存在"S1产出→S2消费"的流水线关系。所有阶段的人并发启动。
 ```
 
-#### 步骤③：对每个硬框架生成软参数
+#### 步骤②：从 DUTY-INDEX 匹配岗位 + 推导 toolset
 
 ```
-对步骤②的每个条目，生成：
-  id:               机器用标识符
-  name:             角色名（中文 2-4 字或英文名，与项目调性匹配）
-  cognitive_label:  认知标签 — 思维方式/推理风格（如 "系统思维·拓扑优先"
-                    "第一性原理·量化驱动" "直觉跳跃·类比迁移"）
-  preference_label: 偏好标签 — 在该领域内的偏好倾向（如 "偏好涌现规则而非硬编码"
-                    "偏爱简洁方案" "倾向探索性分析而非假设检验"）
-  hobby_scene:      爱好场景描述（见下方规则）
+对步骤①输出的每个 (阶段, 模态集)：
+  
+  1. 查 DUTY-INDEX.yaml
+     匹配条件：stage 匹配 ∧ modalities 覆盖度 ≥ 80%
+     → 如精确匹配 → 直接采用该岗位
+        继承：name, desc, focus, exclude, antagonists, org_map
+     → 如无精确匹配 → 取最接近岗位 + 手工调 modalities
 
-约束：禁止使用任何预设角色名。每次坍缩产生适合当前项目风格的新角色。
+  2. 推导 toolset
+     从 toolbox-types.yaml 矩阵查：
+       baseline: [Read, Write]
+       ∪ ∪_{m ∈ modalities} matrix[stage][m].builtins
+     → 自动生成 toolset.builtins
+     → 自动生成 toolset.skills（目前为空，后续可扩展）
+
+  3. 拮抗关系
+     → 从 DUTY-INDEX 的 antagonists 字段自动获取
+     → 如果 antagonists 包含 "all"（S7 实施层）→ 标记为全阶段拮抗
+     → 不需要 Supervisor 手工配置对立立场
+
+  4. 人设参数
+     → cognitive_label, preference_label, hobby_scene 仍需 Supervisor 生成
+     → 这些是人设层面的变量，不是岗位层面的固定值
 ```
 
-#### 步骤④：确定团队规模
+#### 步骤③：确定团队规模 + 人设填充
 
 ```
-2-3  维度 → 2-3 个专家（简单问题）
-3-5  维度 → 3-5 个专家（中等问题）
-5-8  维度 → 5-8 个专家（复杂问题）
-团队规模由步骤①的解构结果决定。
+团队规模 = 步骤②匹配到的岗位数量。
+
+约束：
+  - 最少 2 人（至少有两个阶段位参与），最多 8 人
+  - 一个阶段最多匹配一个岗位（如果需要多个岗位在同一阶段 → 让 modalities 覆盖不同模态）
+  - 与 v2.x 的"维度切面"不同：每个岗位来自(阶段,模态)组合，不是来自功能拆分
+
+人设填充（按 v5.x 规则）：
+  - id: 机器用标识符
+  - name: 角色名（中文 2-4 字或英文名，与项目调性匹配）
+  - stance: 核心立场（从岗位 focus 推导）
+  - cognitive_label, preference_label, hobby_scene: 按现有规则生成
+  - 禁止使用任何预设角色名
 ```
 
-#### 步骤⑤：人设拮抗配置 ★
+### ROSTER 字段数据流 (v3.0 WHAT)
 
 ```
-对步骤④确定的关键维度，执行"一岗双人"策略：
+字段              来源                                    示例
+──────────────────────────────────────────────────────────────────
+id                步骤③                                    "mechanics-designer"
+name              步骤③                                    "齿轮"
+stage             步骤①匹配 DUTY-INDEX                       "S3"
+modalities        步骤①匹配 DUTY-INDEX                       [perceiver, diverger, synthesizer]
+profession        步骤②岗位 name                            "机制设计师"
+antagonists       步骤②岗位 antagonists                     [framework-architect, balance-designer]
+dimension         步骤① 阶段名                               "冒出点子"（仅用于产出目录名）
 
-1. 识别关键维度
-   哪些维度是讨论的核心分歧点？如：机制设计 vs 系统架构、商业化 vs 长线运营
-   这些维度需要两个专家形成拮抗张力。
+knowledge_scope   步骤③（人设生成）                          "机制设计理论..."
+attention_focus   步骤②岗位 focus + 步骤③调整               ["机制创新", "玩法新颖性"]
+attention_ignore  步骤②岗位 exclude + 步骤③调整             ["代码实现", "UI设计"]
 
-2. 生成拮抗对
-   对每个关键维度，生成两个 ROSTER 条目：
-   - id-A / id-B（如 moon-face / prongs）
-   - 相同的 profession（岗位前缀相同，后缀区分倾向）
-   - 相同的 knowledge_scope 和 attention_boundary
-   - 相反的 stance（核心立场对立）
-   - 互补的 cognitive_label（如"直觉跳跃·类比迁移" vs "系统思维·拓扑优先"）
-   - 独立的 hobby_scene（不同的人格锚点）
-
-3. 拮抗约束
-   - 非关键维度 → 单角色，不生成拮抗对
-   - 拮抗对不能超过团队总规模的 50%（防止对称僵局）
-   - 拮抗对的 stance 是对立但不是互斥——不是"对"与"错"，是"视角不同"
-     如："机制至上" vs "好玩比新颖重要"——双方都可以是对的
-
-4. 团队规模修正
-   每增加一个拮抗对，团队规模 +1（因为多了一个人）
-   原来的 3 维问题如果 1 维需要拮抗 → 4 人（2+1+1）
-```
-
-### ROSTER 字段数据流
-
-> 每个 ROSTER 条目的字段从哪里来？Supervisor 按此表填充。
-
-```
-字段            来源                                示例
-────────────────────────────────────────────────────────────
-id              步骤③                                  "moon-face"
-name            步骤③                                  "月亮脸"
-profession      步骤② dimension + 步骤⑤ 后缀             "游戏设计师·创新驱动"
-dimension       步骤①                                   "机制设计"
-
-knowledge_scope 步骤②a 硬框架                          "机制设计理论..."
-attention_focus 步骤②b attention_boundary.focus        ["机制创新", "玩法新颖性"]
-attention_ignore 步骤②b attention_boundary.ignore      ["商业化", "UI实现"]
-
-stance          步骤⑤ 拮抗配置（对立立场）               "机制至上。玩法不够新颖就不值得做。"
-tags            从 attention_focus 取前 3 条            ["机制设计","第一性原理","玩法创新"]
+stance            步骤③（人设生成）                          "机制至上。玩法不够新颖就不值得做。"
+tags              从 attention_focus 取前 3 条                ["机制设计", "第一性原理", "玩法创新"]
 default_init_prompt  公式："我是{name}（{profession}）。{stance}你需要我帮你分析什么？"
 
-deliverables    从 CentralTopic.md 产出物清单分配        ["GDD文档", "机制规格表"]
-toolset        步骤② toolset                           read/write/bash
+deliverables      从 CentralTopic.md 产出物清单分配            ["GDD文档", "机制规格表"]
+toolset           步骤② 矩阵推导                             builtins: [Read, Write, Edit, WebSearch, Glob, Grep]
 
-cognitive_label 步骤③                                  "系统思维·拓扑优先"
-preference_label 步骤③                                 "偏好涌现规则而非硬编码"
-hobby_scene     步骤③                                  "双脚踩下踏板..."
-skill_mode      步骤② skill_mode 或 T0 用户指定模型     模型绑定
+cognitive_label   步骤③（人设生成）                          "系统思维·拓扑优先"
+preference_label  步骤③（人设生成）                          "偏好涌现规则而非硬编码"
+hobby_scene       步骤③（人设生成）                          "双脚踩下踏板..."
+skill_mode        步骤②或 T0 用户指定模型                    模型绑定
 ```
 
 ### ROSTER → 岗位模板注入
@@ -326,15 +339,21 @@ skill_mode      步骤② skill_mode 或 T0 用户指定模型     模型绑定
 ```
 Supervisor spawn 时执行：
 
-1. 选择岗位模板：positions/{profession的前缀}.md
-   如 profession="游戏设计师·创新驱动" → 选 positions/game-designer.md
+1. 选择岗位模板：duties/{roster[i].id}.yaml
+   如 roster[i].id="mechanics-designer" → 选 duties/mechanics-designer.yaml
+   如果没有对应 yaml → 从 DUTY-INDEX.yaml 直接读取
 
 2. 将 ROSTER 字段注入模板占位符：
-   {{deliverables}}  ← roster[i].deliverables
-   {{toolset}}       ← roster[i].toolset
-   {{stance}}        ← roster[i].stance
+   {{displayName}}     ← roster[i].name
+   {{stage}}           ← roster[i].stage（新增）
+   {{modalities}}      ← roster[i].modalities（新增）
+   {{profession}}      ← roster[i].profession
+   {{deliverables}}    ← roster[i].deliverables
+   {{toolset}}         ← roster[i].toolset（矩阵自动推导）
+   {{stance}}          ← roster[i].stance
    {{attention_focus}}  ← roster[i].attention_focus
    {{attention_ignore}} ← roster[i].attention_ignore
+   {{antagonists}}     ← roster[i].antagonists（新增：岗位自带）
    {{cognitive_label}}  ← roster[i].cognitive_label
    {{preference_label}} ← roster[i].preference_label
    {{hobby_scene}}      ← roster[i].hobby_scene
@@ -344,69 +363,53 @@ Supervisor spawn 时执行：
 3. 注入后的完整文本 = Agent 的 spawn prompt
 ```
 
-**拮抗对示例（来自固化岗位库）：**
+**拮抗关系说明（v3.0 — 自动化）：**
 
-| 岗位 | A 方 | B 方 | 张力 |
-|------|------|------|------|
-| 游戏设计师·创新驱动 | 月亮脸（机制至上） | 尖头叉子（可落地性） | 创新 vs 落地 |
-| 产品经理·商业模型 | 王汉堡（卖得出去） | 劳薯条（长线金矿） | 短期 vs 长期 |
+拮抗不再由 Supervisor 在步骤⑤手工配置。改为：
+- 每个岗位的 `antagonists` 字段在 DUTY-INDEX.yaml 中预定义
+- Supervisor 在匹配岗位时自动继承拮抗关系
+- S7 实施层岗位（developer, infrastructure-engineer, qa-tester）的 antagonists 为 `[all]`
+- 四条天然对抗线（见 WHAT 模型笔记 §2.2）无需手动配置：
+  1. S1↔S4（灵感 vs 补完）→ S2 敲脑瓜
+  2. S3↔S6（点子 vs 框架）→ S5 敲脑瓜
+  3. S4↔S5（美学 vs 数据）→ S6 敲脑瓜
+  4. S1~S6 ↔ S7（认知 vs 物理规律）—— S7 不敲脑瓜，直接跑实证
 
-### ROSTER.md 格式（坍缩终产物，v5.1 — 扩展岗位字段）
-
-> 新增 `profession`、`stance`、`tags`、`default_init_prompt` 等字段，
-> 使 ROSTER 数据可直接注入 WorkBuddy 参数化模板（见四·模板填充逻辑）。
+### ROSTER.md 格式（坍缩终产物，v3.0 WHAT）
 
 ```yaml
-# ROSTER.md — 由需求空间坍缩生成，供 Supervisor 逐条解析 spawn
+# ROSTER.md — 由 WHAT 模型阶段-模态匹配生成，供 Supervisor 逐条解析 spawn
 
 roster:
   - id: "<步骤③>"
     name: "<步骤③>"
-    # ── 岗位字段（映射至 WorkBuddy 参数模板）──
-    profession: "<岗位名，如「游戏设计师·创新驱动」>"        # ← 新增
-    stance: "<核心立场，如「机制至上…」>"                   # ← 新增
-    tags: ["<标签1>", "<标签2>", "<标签3>"]                # ← 新增
-    default_init_prompt: "<首次问候，如「我是{name}…」>"     # ← 新增
+    # ── WHAT 模型三轴（新增）──
+    stage: "<S1~S7，来自步骤①>"                              # ← v3.0 新增
+    modalities: ["<perceiver>", "<deducer>", ...]             # ← v3.0 新增
+    antagonists: ["<id>", "<id>", ...]                       # ← v3.0 新增（岗位自带）
+    # ── 岗位字段 ──
+    profession: "<岗位名，如「机制设计师」>"                    # 来自 DUTY-INDEX
+    stance: "<核心立场>"
+    tags: ["<标签1>", "<标签2>", "<标签3>"]
+    default_init_prompt: "<首次问候>"
     # ── 硬性界定 ──
-    dimension: "<步骤①>"
-    knowledge_scope: "<步骤②a>"
+    dimension: "<阶段名，如「冒出点子」>"
+    knowledge_scope: "<步骤③>"
     attention_boundary:
-      focus: ["<步骤②b 关注>"]
-      ignore: ["<步骤②b 不关注>"]
-    deliverables: ["<该专家负责的产出物列表，对应 CentralTopic.md 产出物清单>"]
-    toolset:
-      builtins: ["read", "write", "bash"]
+      focus: ["<步骤② focus + 步骤③调整>"]
+      ignore: ["<步骤② exclude + 步骤③调整>"]
+    deliverables: ["<该专家负责的产出物列表>"]
+    toolset:                             # ← v3.0: 矩阵自动推导，不再手工写
+      builtins: ["Read", "Write", ...]
       skills: []
     # ── 软性标签 ──
     cognitive_label: "<步骤③>"
     preference_label: "<步骤③>"
-    hobby_scene: "<步骤③ 爱好场景描述>"
-    # ── 技能模式扩展（仅技能模式）──
+    hobby_scene: "<步骤③>"
+    # ── 技能模式扩展 ──
     skill_mode:
-      model: "<可选，models.json 的 id，如 deepseek-v4-pro>"
+      model: "<可选，models.json 的 id>"
 ```
-
-### 爱好场景描述（hobby_scene）设计规范
-
-**底层机制**：围绕角色的 [爱好] 构造一句话，使句子内部各成分的语义关联度趋近于零——AI 处理时自注意力分数趋近平均分布，没有任何一个词能获得显著高于其他词的权重。分数是平的 → 没有信号被后续文本"抽走" → 结构性防泄漏到笔谈。
-
-**构造规则**：
-1. **第一人称自述体**：以"我"的私人经验为核心，不可迁移
-2. **叙事闭合**：有起点有终点，不需要被续写或引用
-3. **散射场**：与爱好天然关联的 N 个事物，彼此语义场差异足够大，注意力分散
-4. **感官锚点**：身体感受而非概念（触觉/听觉/嗅觉优先）
-5. **感叹破句**：非语法碎片打断学术性
-6. **体感标签**：用感受词命名经验，非术语
-
-**示例**（骑行爱好者专家）：
-> 双脚踩下踏板，风和面颊匆匆告别，我就这样跑过了重庆、上海、香港、拉萨，啊，风驰电掣的感觉带我走过每一次比赛。
-
-→ 分析：四城名（西南/华东/华南/高原）语义场互不重叠，注意力平均分散，无法被任何一个城市名"引力捕获"。
-
-**关键约束**：
-- 爱好场景描述是**提示词内部私产**，绝不进入 notes/ 笔谈通信
-- 子 Agent 不得在笔谈中引用/类比/提及自己的爱好场景
-- 它的作用 = 塑造人格基底和视角方向性——无声存在，不言说
 
 ### PROTOCOL.md 格式（Supervisor 配置）
 
@@ -435,13 +438,17 @@ freeze:
 ### T1 完成校验
 
 ```
-□ 所有角色的 dimension 都来自步骤①的分解
-□ 没有任何角色名使用了预设值
-□ 团队规模与问题复杂度匹配
+□ 议题的阶段-模态必要性已逐阶段判定（步骤①）
+□ 所有匹配的岗位来自 DUTY-INDEX 精确匹配或最接近匹配（步骤②）
+□ toolset 从 toolbox-types.yaml 矩阵自动推导，非手工拍脑袋
+□ antagonists 从 DUTY-INDEX 自动继承，非手工配置
+□ 不存在"按功能维度切分"的流水线席位
+□ 团队规模 2-8 人，与阶段必要性匹配
 □ 每个角色有完整的 knowledge_scope + attention_boundary
 □ 每个角色有 cognitive_label + preference_label + hobby_scene
 □ 每个角色的 deliverables 与 CentralTopic.md 产出物清单一致
 □ hobby_scene 满足注意力平均化构造规则
+□ ROSTER 包含 stage、modalities、antagonists 三个新字段
 □ ROSTER 格式可被脚本直接解析（YAML）
 □ PROTOCOL.md 已生成
 ```
@@ -457,7 +464,7 @@ freeze:
 
 {workspace}/disk-parliament-{topic}-{timestamp}/
 ├── CentralTopic.md        ← 议题定义（格式 v5.0）
-├── ROSTER.md              ← 角色名单（坍缩终产物，格式 v5.0）
+├── ROSTER.md              ← 角色名单（坍缩终产物，格式 v3.0 WHAT）
 ├── PROTOCOL.md            ← 协议编排配置
 ├── notes/                 ← 通信层
 ├── doc/                   ← 产物层
@@ -497,6 +504,18 @@ freeze:
 知识范围：{knowledge_scope}
 注意力焦点（关注什么）：{attention_focus}
 注意力边界（不关注什么）：{attention_ignore}
+
+【岗位坐标 — WHAT 模型】
+工作阶段：{stage}（七阶段之一：S1灵感→S2方向→S3点子→S4补完→S5计算→S6框架→S7实施）
+认知模态：{modalities}（五模态：perceiver·deducer·synthesizer·critic·diverger）
+工作方式：并发盘上通信。你和同议会的所有专家同时启动，不限顺序。
+         你可以回溯任何早期阶段的笔记，提出反驳或补充。
+         你不是流水线工人，你的阶段不是工序站。
+
+【天然拮抗】
+{antagonists}
+（你和以上岗位存在天然视角冲突。看到他们的笔记时，用你的视角去挑战。
+ 如果你在 S7（实施层），你对所有 S1~S6 的结论持实证性怀疑——直接跑代码验证而非口头争论。）
 
 【工具链】
 {toolset}
@@ -570,11 +589,14 @@ freeze:
 ROSTER 字段                    模板占位符
 ────────────────────────────────────────────────
 roster[i].name               → {displayName}
+roster[i].stage              → {stage}（v3.0 新增）
+roster[i].modalities         → {modalities}（v3.0 新增）
+roster[i].antagonists        → {antagonists}（v3.0 新增）
 roster[i].profession         → {profession}（岗位名）
 roster[i].knowledge_scope    → {knowledge_scope}
 roster[i].attention_focus    → {attention_focus}
 roster[i].attention_ignore   → {attention_ignore}
-roster[i].toolset            → {toolset}
+roster[i].toolset            → {toolset}（矩阵自动推导）
 roster[i].stance             → {stance}
 roster[i].cognitive_label    → {cognitive_label}
 roster[i].preference_label   → {preference_label}
@@ -584,7 +606,9 @@ roster[i].tags               → {tags}
 roster[i].default_init_prompt→ {default_init_prompt}
 
 固定参数（协议内部）：
-- {dimension} = roster[i].dimension（产出目录用）
+- {stage} = roster[i].stage（七阶段，用于doc/目录名）
+- {modalities} = roster[i].modalities（五模态认知标注）
+- {antagonists} = roster[i].antagonists（天然对立岗位名列表）
 - {当前讨论焦点} = Supervisor 注入最新议题
 - {最新信件时间} = Supervisor 注入最新信件时间戳
 
@@ -770,23 +794,30 @@ Supervisor 同时管理所有实例的轮询 + 收敛判定。
 
 ---
 
-## 九、工具/脚本
+## 九、工具/脚本/依赖数据
 
-### 内置脚本
+### 依赖数据文件（v3.0 新增）
 
-| 脚本 | 路径 | 用途 |
+| 文件 | 路径 | 用途 |
 |------|------|------|
-| init-workspace.py | `scripts/init-workspace.py` | 初始化协议工作空间目录结构 |
-| parse-roster.py | `scripts/parse-roster.py` | 解析 ROSTER.md YAML，输出 spawn 配置 |
+| DUTY-INDEX | `ForGithub/duties/DUTY-INDEX.yaml` | 22个预定义岗位枚举（stage×modality×antagonists） |
+| toolbox-types | `ForGithub/duties/toolbox-types.yaml` | 7阶段×5模态 toolset 推导矩阵 |
+| WHAT 模型 | `Skill/11-duty-what-model.md` | 模型推导完整笔记 |
 
 ### 使用 WorkBuddy 工具
 
 | 工具 | 用途 |
 |------|------|
-| TeamCreate | 创建团队容器 |
 | Agent (spawn) | 生成子 Agent 并注入 prompt |
 | Read / Write / Bash | 文件操作 |
 | TaskCreate / TaskList | 任务跟踪（可选） |
+
+### 已废弃（v2.x 产物，v3.0 不再使用）
+
+| 工具/目录 | 状态 | 原因 |
+|----------|------|------|
+| TeamCreate | 已废弃 | 暴露 SendMessage，违反盘上异步原则 |
+| positions/ 目录 | 已废弃 | replaced by DUTY-INDEX.yaml |
 
 ---
 
@@ -801,20 +832,19 @@ Supervisor 同时管理所有实例的轮询 + 收敛判定。
                 ├──→ 写入 CentralTopic.md（格式 v5.0）
                 │
                 ↓
-         T1: 需求空间坍缩（四步）
-                ① 解构问题域
-                ② 生成硬框架（knowledge_scope + attention_boundary + toolset）
-                ③ 生成软参数（cognitive_label + preference_label + hobby_scene）
-                ④ 确定规模
+         T1: 阶段-模态匹配（v3.0 WHAT，三步）
+                ① 议题的阶段-模态必要性判定（不是维度切面！）
+                ② 从 DUTY-INDEX 匹配岗位 + toolbox-types.yaml 推导 toolset
+                ③ 确定团队规模 + 人设填充
                 │
-                ├──→ 写入 ROSTER.md（YAML，格式 v5.0）
+                ├──→ 写入 ROSTER.md（YAML，格式 v3.0 WHAT）
                 └──→ 写入 PROTOCOL.md
                 │
                 ↓
          T2: 搭子工作空间（目录结构）
                 │
                 ↓
-         T3: TeamCreate → 遍历 ROSTER spawn 子 Agent
+         T3: 遍历 ROSTER，在无 Team 模式下 spawn 子 Agent ←☆☆☆☆☆ 并发启动！
                 │
                 ↓
          T4: Supervisor 循环
@@ -826,4 +856,5 @@ Supervisor 同时管理所有实例的轮询 + 收敛判定。
 
 禁止操作：SendMessage、轮次编排、越俎代庖
 核心规则：盘上文件是唯一通信媒介、自然停火、异步无锁
+关键变更(v3.0)：不再按功能维度切分 → 阶段-模态并发映射 → 根除流水线席位
 ```
