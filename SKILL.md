@@ -1,7 +1,7 @@
 ---
 name: disk-parliament
 description: >
-  专家议会 v3.0 — 多 Agent 盘上异步通信协议。基于 WHAT 模型（7工作阶段×5认知模态）
+  专家议会 v3.1 — 多 Agent 盘上异步通信协议。基于 WHAT 模型（7工作阶段×5认知模态）
   从 DUTY-INDEX 匹配岗位→自动推导 toolset→spawn 子 Agent（支持逐专家绑定不同模型）
   →并发盘上写信（禁止 SendMessage）→自然停火→收敛冻结。
   引入岗位系统（22个预定义岗位，自带 stage×modality×antagonists），
@@ -16,13 +16,14 @@ description: >
   开个异步会议、角色扮演讨论、多角色碰撞、专家会诊、
   复杂问题分析、话题讨论、团队协作、分工讨论。
 metadata:
-  version: "3.0"
+  version: "3.1"
   protocol_version: "v6.0-WHAT"
   agent_created: true
   depends_on:
     - "ForGithub/duties/DUTY-INDEX.yaml"       # 22岗位枚举
     - "ForGithub/duties/toolbox-types.yaml"    # 7×5矩阵
-    - "Skill/11-duty-what-model.md"            # WHAT模型推导
+    - "GateGuardian.ini"                        # v3.1: 私有算力门禁
+    - "scripts/gate_guardian.py"                # v3.1: 门禁验证脚本
 ---
 
 # 专家议会（DiskParliament）v3.0
@@ -93,6 +94,91 @@ Supervisor 必须：
   - 如果用户指定了模型名，确认其是否在 models.json 中有对应 id
   - 如果用户用了 display name（如 "DeepSeek-V4 Pro"）而非 id，纠正之
   - 将模型配置写入 CentralTopic.md（见下方模板更新）
+```
+
+### T0a-bis — 私有算力门禁（v3.1 新增）
+
+**目的**：检查用户是否配置了私有算力 API，避免技能静默烧积分。
+
+```
+Supervisor 执行（按顺序）：
+
+1. 运行门禁脚本
+   python scripts/gate_guardian.py --check
+
+2. 解析 JSON 输出：
+   - gate.status == "BLOCKED" → 进入步骤 3
+   - gate.status == "READY"   → 进入步骤 4
+
+3. informed=false 时 — 引导用户配置
+   向用户输出：
+   """
+   ⚠️ GateGuardian: 私有算力门禁未通过。
+
+   技能需要确认你希望使用积计算力还是自定义算力来支撑专家团。
+   如果你想使用自定义算力（不烧积分），请：
+     1. 打开 {skill_dir}/GateGuardian.ini
+     2. 在 [Models] 部分填入你的模型声明。
+        格式：model_id = endpoint_url, api_key
+        - 如果模型在 models.json 中存在：只写 model_id =
+        - 如果模型不在 models.json 中：写完整 model_id = url, key
+          然后运行 python scripts/gate_guardian.py --install 自动注入
+     3. 配置好后重新验证
+
+   现在你可以选择：
+     a) 配置 GateGuardian.ini（使用自定义算力）
+     b) 跳过，全部使用积分算力
+   """
+   等待用户回复。如果匹配到 installable 模型 → 主动提示 --install。
+   运行 --install 后 → 重新执行 --validate。
+
+4. informed=true 时 — 确认算力来源
+   解析 gate_guardian.py --list-models 的输出，获取：
+     - available: 可用模型列表（含 supportsImages 信息）
+     - image_capable: 支持图像输入的模型
+
+   向用户输出：
+   """
+   ✅ GateGuardian: 私有算力门禁通过。
+   
+   📋 可用的自定义模型（{n} 个）：
+     | 模型 ID | 厂商 | 支持图像 |
+     |---------|------|:------:|
+     | id1     | xxx  | ✅/❌   |
+     ...
+
+   🔍 支持图像的模型（{m} 个）：{id1, id2, ...}
+
+   请确认算力来源：
+     a) 全部使用积分算力（WorkBuddy 默认）
+     b) 全部使用自定义算力（上面的列表）
+     c) 混合使用（图像岗位用积分，非图像用自定义）
+     d) 每个专家单独配置
+   """
+   等待用户选择。
+
+5. 图像岗位特殊处理
+   如果议题需要的岗位涉及图像输入（如美术指导 art-director、
+   趋势观察员 trend-observer 等需要视觉分析的岗位）：
+   
+   → 检查 image_capable 列表是否为空
+   → 如果为空 → 强制告知用户：
+     """
+     ⚠️ 以下岗位可能需要图像输入能力：
+       - {image_duty_list}
+     当前自定义算力中没有支持图像的模型。
+     这些岗位将 <b>必须使用积分算力</b>。
+     确认继续？
+     """
+   → 如果非空 → 提示用户可以使用自定义图像模型，由用户选择。
+
+6. 写入 CentralTopic.md 的模型配置段
+   根据用户选择，在 CentralTopic.md 「模型配置」部分写入：
+     - 全局模型 → 使用自定义模型的 id 列表
+     - 专家个性化绑定 → 逐个标注
+     - 图像岗位 → 标注为"积分算力"（如果用户选 c）
+
+7. 门禁确认后 → 进入 T0b（格式肃正）
 ```
 
 ### T0b — 格式肃正（Supervisor 必须执行）
@@ -205,7 +291,9 @@ CentralTopic.md 写入前，验证模型名字符串：
 
 ```
 □ 用户明确提供了讨论主题 + 目标产物
-□ 用户明确了模型配置（全局模型 / 个性化绑定 / 默认）
+□ GateGuardian 门禁已通过（informed=true 或用户确认使用积分算力）
+□ 图像岗位的算力来源已确认
+□ 用户明确了模型配置（全局模型 / 个性化绑定 / 混合 / 积分默认）
 □ 模型名已确认使用 models.json 的 id 格式（非 display name）
 □ 议题边界已划定
 □ 歧义关键词已消歧
@@ -819,12 +907,26 @@ Supervisor 同时管理所有实例的轮询 + 收敛判定。
 | TeamCreate | 已废弃 | 暴露 SendMessage，违反盘上异步原则 |
 | positions/ 目录 | 已废弃 | replaced by DUTY-INDEX.yaml |
 
+### v3.1 新增
+
+| 文件 | 路径 | 用途 |
+|------|------|------|
+| GateGuardian.ini | `GateGuardian.ini` | 私有算力门禁配置（模型ID声明） |
+| gate_guardian.py | `scripts/gate_guardian.py` | 门禁验证+注入脚本（--check/--validate/--install/--list-models） |
+
 ---
 
 ## 十、完整流程一览
 
 ```
 用户触发 —→ T0a: 议题提取（强制索要主题 + 产出）
+                │
+                ↓
+         T0a-bis: GateGuardian 私有算力门禁
+                 → scripts/gate_guardian.py --check
+                 → informed=false? 引导用户配置或使用积分
+                 → informed=true? 列出可用模型，确认算力来源
+                 → 图像岗位特殊处理
                 │
                 ↓
          T0b: 格式肃正（边界 / 关键词消歧 / 产出 Schema）
